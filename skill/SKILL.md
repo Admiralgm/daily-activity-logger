@@ -68,14 +68,17 @@ status: complete
 
 ### Minimal Entry (quick log)
 ```
-YYYY-MM-DD | agent | Short summary of what was accomplished
+YYYY-MM-DD | AGENT | Short summary of what was accomplished
 ```
 
 ## Quick Start (ALWAYS DO THIS)
 
 When user says "execute daily activity logger" or "log today's activity":
 
-1. **Check ALL profiles** — `ls -lt` the sessions dirs for agent, agent, agent, agent (and default). A profile with session files modified today had activity.
+1. **Check ALL profiles** — Three-layer detection, run ALL three in parallel:
+   a) **Session files** — `ls -lt config/profiles/hermesN/sessions/` for N=0,1,2,3 AND default. A profile with session files modified today had activity.
+   b) **Live processes** — `ps aux | grep "hermes -p hermesN" | grep -v grep` for N=0,1,2,3. A TUI process can run for days without writing new session files — the process start time (from `ps -o lstart`) tells you when it began, and if it's still alive, it was active today even if no session files exist for today's date.
+   c) **Log timestamps** — `ls -lt config/profiles/hermesN/logs/*.log 2>/dev/null | head -5` for N=0,1,2,3. Gateway/TUI logs record activity on a given date even when no session files exist for that date.
    ⚠️ WARNING: Do NOT use `session_search(profile='hermesN', ...)` to check per-profile activity - the profile parameter in session_search does NOT filter by profile and will return sessions from all profiles. Always check the filesystem session directories directly as shown above.
 
 2. **Check existing log** — `cat config/wiki/activity/YYYY-MM-DD.md` to see if a file already exists and what it covers.
@@ -92,16 +95,16 @@ When asked to "execute daily activity logger" and existing logs show gaps:
 2. **Search session DB per date** — One `session_search(query="YYYY-MM-DD")` per missing date. Required field: `sort=newest`.
 3. **Handle compression gracefully** — Discovery results are heavily compacted. Use the `bookend_start` and `messages` arrays as the primary source. Read persisted tool output files from `/var/folders/fr/v7gh2ttj2q97xyb40q1g6qx40000gp/T/hermes-results/` if you need detail not visible in the snippet.
 4. **Cross-reference with filesystem** — Check known output directories (tracker dirs, `~/Desktop/`, skill workdirs) for files with matching timestamps to infer what was done on that day even when session text is sparse.
-5. **Cross-reference with memory** — `memory.md` and `user.md` often contain date-stamped facts ("SINHRO MERGE 2026-06-20: +0h1 +1h2 +0h3") that anchor what happened.
+5. **Cross-reference with memory** — `memory.md` and `user.md` often contain date-stamped facts ("2026-06-20: cross-profile merge, AGENT/2/3 active") that anchor what happened.
 6. **Write one file per missing date** — Same full entry format as Pattern 1, even if some sections are brief. "Session data heavily compacted; recovered from session_search + filesystem state" is a valid entry.
-7. **Check `-l` flag resolution** — Hermes `memory.md` may list `SINHRO MERGE <date>` entries that confirm activity even when session_search returns 0 sessions. Do NOT create zero-day logs if no evidence exists, but DO create them if memory, filesystem, or session artifacts confirm work happened.
+7. **Check `-l` flag resolution** — Hermes `memory.md` may list date-stamped merge entries that confirm activity even when session_search returns 0 sessions. Do NOT create zero-day logs if no evidence exists, but DO create them if memory, filesystem, or session artifacts confirm work happened.
 
 ### Pattern 4: Full-History Backfill (All Profiles, All Dates)
 
 When asked to "log everything which was not logged on all hermes profiles":
 
 1. **Inventory existing logs** — List all *.md files in `config/wiki/activity/`, extract date strings.
-2. **Inventory session dates per profile** — For each profile (agent, agent, agent, agent), parse session filenames in `config/profiles/<profile>/sessions/` to extract unique dates. Use `ls -1` + regex on filenames, not individual session_search calls.
+2. **Inventory session dates per profile** — For each profile (AGENT, AGENT, AGENT, AGENT), parse session filenames in `config/profiles/<profile>/sessions/` to extract unique dates. Use `ls -1` + regex on filenames, not individual session_search calls.
 3. **Cross-reference** — For each date with sessions, check if a log file exists AND which profiles are mentioned in it. Use `grep -c 'hermesN'` per file.
 4. **Classify gaps** into three categories:
    - **Missing log file** (sessions exist but no YYYY-MM-DD.md at all) -> create new file with write_file
@@ -135,7 +138,7 @@ ENTRY
 ### Pattern 2: Quick One-Liner
 
 ```bash
-echo "YYYY-MM-DD | agent | Short summary" >> config/wiki/activity/YYYY-MM-DD.md
+echo "YYYY-MM-DD | AGENT | Short summary" >> config/wiki/activity/YYYY-MM-DD.md
 ```
 
 ### Pattern 3: Read Today's or Yesterday's Log
@@ -159,8 +162,8 @@ When multiple profiles share the same activity directory:
 
 Example for a handoff log between profiles:
 ```
-2026-06-04 | agent | Camoufox fix + 4-portal scrape, 12 new JDs, tracker updated
-2026-06-04 | agent | Impactpool scan: 8 JDs scored, updated tracker
+2026-06-04 | AGENT | Camoufox fix + 4-portal scrape, 12 new JDs, tracker updated
+2026-06-04 | AGENT | Impactpool scan: 8 JDs scored, updated tracker
 ```
 
 ## Pitfalls
@@ -169,12 +172,13 @@ Example for a handoff log between profiles:
   ```bash
   # List session files per profile
   ls -la config/sessions/ | tail -20
-  ls -la config/profiles/agent/sessions/ | tail -20
-  ls -la config/profiles/agent/sessions/ | tail -20
+  ls -la config/sessions/ | tail -20
+  ls -la config/sessions/ | tail -20
   ```
   Session filenames contain dates (e.g., `session_20260623_165329_*.json`). Extract the date prefix to determine which days had activity per profile. If a profile had sessions that day, include it in the log. If a profile had no sessions, note it explicitly ("No sessions on June 20"). If a profile had sessions but they weren't logged, backfill them. The user will ask "did it cover all profiles?" if you miss one — prevent that question by checking proactively.
-- **`session_search` profile parameter does NOT filter by profile** — When called with `profile="hermesN"`, `session_search` returns the SAME sessions regardless of the parameter value. The `profile` parameter only changes which database file is read for resolving `@session:<profile>/<id>` links, NOT which sessions are searched. Do NOT rely on `session_search(profile="agent")` to find agent-specific activity — use filesystem session directories instead (see pitfall above). See `references/filesystem-session-detection.md` for the canonical detection script.
-- **Filesystem detection misses TUI sessions — ALWAYS run session_search in parallel** — `ls -1 sessions/ | grep "YYYYMMDD"` finds `request_dump_*` files, but TUI sessions that don't generate API request dumps are invisible to this method. On 2026-07-25, agent had 5 active TUI sessions (14-JD scoring, cross-profile CV generation, OCR migration, 3 job scans) but filesystem detection returned zero for all profiles — all 5 sessions were only found via `session_search(query="2026-07-25")`. **Correct approach**: run BOTH `ls -1` and `session_search` in parallel, then cross-reference. If either method finds activity, include it. Filter `session_search` results by `session_id.startswith('YYYYMMDD')` to avoid false-positive date matches from deadline fields.
+- **`session_search` profile parameter does NOT filter by profile** — When called with `profile="hermesN"`, `session_search` returns the SAME sessions regardless of the parameter value. The `profile` parameter only changes which database file is read for resolving `@session:<profile>/<id>` links, NOT which sessions are searched. Do NOT rely on `session_search(profile="AGENT")` to find AGENT-specific activity — use filesystem session directories instead (see pitfall above). See `references/filesystem-session-detection.md` for the canonical detection script.
+- **Filesystem detection misses TUI sessions — ALWAYS run session_search in parallel** — `ls -1 sessions/ | grep "YYYYMMDD"` finds `request_dump_*` files, but TUI sessions that don't generate API request dumps are invisible to this method. On 2026-07-25, AGENT had 5 active TUI sessions (14-JD scoring, cross-profile CV generation, OCR migration, 3 job scans) but filesystem detection returned zero for all profiles — all 5 sessions were only found via `session_search(query="2026-07-25")`. **Correct approach**: run BOTH `ls -1` and `session_search` in parallel, then cross-reference. If either method finds activity, include it. Filter `session_search` results by `session_id.startswith('YYYYMMDD')` to avoid false-positive date matches from deadline fields.
+- **Live TUI processes have NO session files — check `ps aux`** — A hermesN TUI process can run for days without writing any new session files to `sessions/`. On 2026-08-01, AGENT had PID 71898 running since Jul 30 17:39, alive all day Aug 1, with 2 massive UN-JOBS-SEARCH sessions (222+334 messages) that started Jul 31 and spilled into Aug 1 — but `ls -1 sessions/ | grep 20260801` returned zero. The only way to detect this was `ps aux | grep "hermes -p AGENT"` and checking the process start time with `ps -o lstart`. **Always run `ps aux | grep "hermes -p hermesN"` for every profile as part of the detection step.** If a process is alive and its start time is before today, it was active today — check its log files (`config/profiles/hermesN/logs/*.log`) for today's timestamps to confirm.
 - **session_search date queries produce false positives** — `session_search(query="2026-06-28")` matches
   ANY occurrence of that date string in session content (deadline fields, tracker data, etc.), not just
   sessions that occurred on that date. Always filter results by `session_id` prefix
@@ -191,10 +195,10 @@ Example for a handoff log between profiles:
 - **Profile label is mandatory** — Essential for multi-profile setups.
 - **Don't create files in the wrong location** — Always use `config/wiki/activity/`, never `~/Downloads/DATA_REPOSITORY/`.
 - **Combined "update wiki AND execute logger" → one activity log per date**: When the user stacks both requests into a single session (e.g., "please update LLM-WIKI and execute daily activity logger"), the activity logger runs once at the end of the session and writes a single `YYYY-MM-DD.md` for that date. If the session happens late in the day (past midnight UTC), use the user's local date (CEST) — don't create two files for the same local day. If the file already exists for that date, append to it or report "already exists" rather than overwrite.
-- **`write_file ~` vs `$HOME` path mismatch:** If you create activity logs via `write_file` with a `~` path, it writes to the Hermes profile's home (`config/profiles/agent/home/`). Subsequent `ls` or `cat` via `terminal` using `~` will look at the REAL home (`~/`) and not find the file. **Always use absolute paths** (`config/wiki/activity/...`) when verifying existence of files written via `write_file`.
-- **Cross-profile wiki editing:** The activity log directory `config/wiki/activity/` is shared across profiles. When running under agent/2/3, you can write to it directly via `terminal()` without cross-profile guard issues (it's not a skill/plugin/cron file). However, `write_file` with `~` paths will resolve to the profile's home, not the real home. Use absolute paths or `terminal()` with heredocs/cat for reliable writes.
+- **`write_file ~` vs `$HOME` path mismatch:** If you create activity logs via `write_file` with a `~` path, it writes to the Hermes profile's home (`config/home/`). Subsequent `ls` or `cat` via `terminal` using `~` will look at the REAL home (`~/`) and not find the file. **Always use absolute paths** (`config/wiki/activity/...`) when verifying existence of files written via `write_file`.
+- **Cross-profile wiki editing:** The activity log directory `config/wiki/activity/` is shared across profiles. When running under AGENT/2/3, you can write to it directly via `terminal()` without cross-profile guard issues (it's not a skill/plugin/cron file). However, `write_file` with `~` paths will resolve to the profile's home, not the real home. Use absolute paths or `terminal()` with heredocs/cat for reliable writes.
 - **`read_file`/`patch` pagination warning:** When you `read_file` a file with `offset`/ `limit` and then immediately `patch` the same file, the patch tool warns: "was last read with offset/limit pagination (partial view)." The patch still succeeds, but the warning is noisy during wiki maintenance at scale. Do a full `read_file` (no offset) before the patch, or simply ignore the warning.
-- **NEVER use `replace_all=true` when appending to log.md via `patch()`** — The `old_string` anchor (e.g. `- agent: No sessions`) can appear multiple times in log.md: once in the new entry being added and once in a prior entry. Using `replace_all=true` replaces ALL matches, creating duplicate copies of the new entry. Hit live on 2026-07-23: the wiki update entry was duplicated because `- agent: No sessions\n- agent: No sessions` appeared twice. **Always use `replace_all=false` (default) and include enough surrounding context (the preceding `## [date] header` line) to make the `old_string` unique.** If patch reports "Found 2 matches", expand the `old_string` — do NOT switch to `replace_all=true`.
+- **NEVER use `replace_all=true` when appending to log.md via `patch()`** — The `old_string` anchor (e.g. `- AGENT: No sessions`) can appear multiple times in log.md: once in the new entry being added and once in a prior entry. Using `replace_all=true` replaces ALL matches, creating duplicate copies of the new entry. Hit live on 2026-07-23: the wiki update entry was duplicated because `- AGENT: No sessions\n- AGENT: No sessions` appeared twice. **Always use `replace_all=false` (default) and include enough surrounding context (the preceding `## [date] header` line) to make the `old_string` unique.** If patch reports "Found 2 matches", expand the `old_string` — do NOT switch to `replace_all=true`.
 
 ## Integration Points
 

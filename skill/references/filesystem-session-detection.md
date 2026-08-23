@@ -15,7 +15,7 @@ Session filenames contain dates in format `YYYYMMDD` (e.g., `request_dump_202606
 ### Detection script (optimal)
 ```bash
 # List session filenames per profile, filtered by date
-for profile in default agent agent agent agent; do
+for profile in default AGENT AGENT AGENT AGENT; do
   dir="config/profiles/${profile}/sessions"
   if [ -d "$dir" ]; then
     count=$(ls -1 "$dir" 2>/dev/null | grep "YYYYMMDD" | wc -l)
@@ -26,7 +26,7 @@ done
 
 ### ⚠️ CRITICAL: Filesystem detection has gaps — ALWAYS cross-check with session_search
 
-Filesystem detection finds `request_dump_*` files in the `sessions/` directory, but **TUI sessions that don't generate API request dumps are invisible to this method**. On 2026-07-25, agent had 5 active TUI sessions with major work (14-JD scoring, cross-profile CV generation, OCR migration, UN scan, NGO scan, remote vacancies scan) but `ls -1 | grep "20260725"` returned **zero** results for all profiles. The sessions were only discoverable via `session_search(query="2026-07-25 OR 2026-07-26")`.
+Filesystem detection finds `request_dump_*` files in the `sessions/` directory, but **TUI sessions that don't generate API request dumps are invisible to this method**. On 2026-07-25, AGENT had 5 active TUI sessions with major work (14-JD scoring, cross-profile CV generation, OCR migration, UN scan, NGO scan, remote vacancies scan) but `ls -1 | grep "20260725"` returned **zero** results for all profiles. The sessions were only discoverable via `session_search(query="2026-07-25 OR 2026-07-26")`.
 
 **Correct approach: run BOTH methods in parallel, then cross-reference:**
 1. Filesystem `ls -1 | grep "YYYYMMDD"` for quick per-profile check
@@ -38,10 +38,10 @@ Filesystem detection finds `request_dump_*` files in the `sessions/` directory, 
 | Profile | Path |
 |---------|------|
 | default | `config/sessions.db` (single DB, no per-profile subdir) |
-| agent | `config/sessions/` |
-| agent | `config/profiles/agent/sessions/` |
-| agent | `config/profiles/agent/sessions/` |
-| agent | `config/profiles/agent/sessions/` |
+| AGENT | `config/sessions/` |
+| AGENT | `config/sessions/` |
+| AGENT | `config/sessions/` |
+| AGENT | `config/sessions/` |
 
 ### Known gotcha — parent directory false positive
 Using `ls -la | grep "Jun 27"` matches the `..` parent directory entry (which shows the dir's own mod date), creating FALSE positives. Always use `ls -1 | grep "YYYYMMDD"` on filenames only.
@@ -49,7 +49,7 @@ Using `ls -la | grep "Jun 27"` matches the `..` parent directory entry (which sh
 ### Centos/quick check
 ```bash
 # One-liner: did any profile have sessions today?
-for p in agent agent agent agent; do
+for p in AGENT AGENT AGENT AGENT; do
   n=$(ls -1 config/profiles/$p/sessions/ 2>/dev/null | grep "20260627" | wc -l)
   [ "$n" -gt 0 ] && echo "$p: YES ($n)" || echo "$p: no"
 done

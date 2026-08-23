@@ -50,7 +50,7 @@ Even when sessions are fully compacted, artifacts survive on disk:
 
 `memory.md` and `user.md` often contain lines like:
 
-- `SINHRO MERGE 2026-06-20: +0h1 +1h2 +0h3`
+- `2026-06-20: cross-profile merge (AGENT/2/3 active)`
 - `Camoufox v2.4.3 updated 2026-05-05`
 
 These anchor dates when session text is sparse. Use them to populate the **Summary** and **Key Activities** lines of the backfilled log.
@@ -64,7 +64,7 @@ Use the standard frontmatter, even if some sections are inferred:
 date: 2026-06-16
 type: activity
 status: complete
-profile: agent
+profile: AGENT
 ---
 ```
 
